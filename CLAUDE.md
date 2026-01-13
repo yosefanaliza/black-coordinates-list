@@ -68,11 +68,11 @@ docker-compose down
 ```bash
 # Service A
 cd service-a
-docker build -t service-a:latest .
+docker build -t service-a:latest -f service-a/Dockerfile .
 
 # Service B
 cd service-b
-docker build -t service-b:latest .
+docker build -t service-b:latest -f service-b/Dockerfile .
 ```
 
 ### Kubernetes/OpenShift Deployment
