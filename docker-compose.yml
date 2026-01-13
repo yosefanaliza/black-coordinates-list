@@ -37,7 +37,7 @@ services:
 
   service-a:
     build:
-      context: .  # Changed from ./service-a to root
+      context: .
       dockerfile: service-a/Dockerfile
     container_name: blackcoord-service-a
     ports:

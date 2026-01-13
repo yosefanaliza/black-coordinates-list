@@ -26,7 +26,7 @@ class AllCoordinatesResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     service: str
-    redis_connected: Optional[bool]  = None
+    redis_connected: Optional[bool] | None = False
     
 class CoordinateStorageResponse(BaseModel):
     """Response model for coordinate storage operations"""
