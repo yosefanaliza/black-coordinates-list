@@ -1,0 +1,64 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: blackcoord-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - blackcoord-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  service-b:
+    build:
+      context: ./service-b
+      dockerfile: Dockerfile
+    container_name: blackcoord-service-b
+    ports:
+      - "8001:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - LOG_LEVEL=INFO
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - blackcoord-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  service-a:
+    build:
+      context: ./service-a
+      dockerfile: Dockerfile
+    container_name: blackcoord-service-a
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICE_B_HOST=service-b
+      - SERVICE_B_PORT=8000
+      - IP_API_TIMEOUT=5
+      - LOG_LEVEL=INFO
+    depends_on:
+      service-b:
+        condition: service_healthy
+    networks:
+      - blackcoord-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+networks:
+  blackcoord-net:
+    driver: bridge
+    name: blackcoord-network

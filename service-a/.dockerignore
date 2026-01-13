@@ -1,0 +1,14 @@
+README.md
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.env
+*.log
+.DS_Store
+.vscode
+.idea
+*.swp
+*.swo
+*~
