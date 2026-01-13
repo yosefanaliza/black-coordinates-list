@@ -14,8 +14,8 @@ services:
 
   service-b:
     build:
-      context: ./service-b
-      dockerfile: Dockerfile
+      context: .  # Changed from ./service-b to root
+      dockerfile: service-b/Dockerfile
     container_name: blackcoord-service-b
     ports:
       - "8001:8000"
@@ -37,8 +37,8 @@ services:
 
   service-a:
     build:
-      context: ./service-a
-      dockerfile: Dockerfile
+      context: .  # Changed from ./service-a to root
+      dockerfile: service-a/Dockerfile
     container_name: blackcoord-service-a
     ports:
       - "8000:8000"

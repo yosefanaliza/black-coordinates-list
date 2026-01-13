@@ -1,7 +1,8 @@
 import json
 import os
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
+from shared.models import CoordinateItem , IPField
 import redis
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ def is_redis_connected() -> bool:
         return False
 
 
-def save_coordinate(ip: str, data: Dict[str, Any]) -> bool:
+def save_coordinate(ip: IPField, data: CoordinateItem) -> bool:
     """
     Save coordinate data to Redis
 
@@ -74,8 +75,8 @@ def save_coordinate(ip: str, data: Dict[str, Any]) -> bool:
     """
     try:
         client = get_redis_client()
-        json_data = json.dumps(data)
-        client.set(ip, json_data)
+        json_data = data.model_dump_json(exclude={"ip"})
+        client.set(str(ip), json_data)
         logger.info(f"Saved coordinates for IP: {ip}")
         return True
     except redis.RedisError as e:
@@ -86,7 +87,7 @@ def save_coordinate(ip: str, data: Dict[str, Any]) -> bool:
         return False
 
 
-def get_all_coordinates() -> List[Dict[str, Any]]:
+def get_all_coordinates() -> List[CoordinateItem]:
     """
     Retrieve all stored coordinates from Redis
 
@@ -97,7 +98,7 @@ def get_all_coordinates() -> List[Dict[str, Any]]:
         client = get_redis_client()
         keys = client.keys("*")
 
-        coordinates = []
+        coordinates:List[CoordinateItem] = []
         for key in keys:
             try:
                 value = client.get(key)

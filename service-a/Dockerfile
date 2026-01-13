@@ -2,18 +2,19 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install curl for healthcheck
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
+# Copy requirements relative to the build context (root)
+COPY service-a/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Copy the shared package
+COPY shared/ ./shared/
 
-# Expose port
+# Copy the service code (the app folder)
+COPY service-a/app/ ./app/
+
 EXPOSE 8000
 
-# Run the application
+# Start from the app module
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

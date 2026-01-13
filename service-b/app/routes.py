@@ -1,20 +1,18 @@
 import logging
 from fastapi import APIRouter, HTTPException, status
 from . import storage
-from .schemas import (
-    CoordinateRequest,
+from shared.models import ( CoordinateItem,
     CoordinateStorageResponse,
     AllCoordinatesResponse,
     CoordinateItem,
-    HealthResponse
-)
+    HealthResponse )
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 @router.post("/coordinates", response_model=CoordinateStorageResponse)
-async def store_coordinates(request: CoordinateRequest):
+async def store_coordinates(request: CoordinateItem):
     """
     Store coordinates received from Service A
 
@@ -25,14 +23,8 @@ async def store_coordinates(request: CoordinateRequest):
         CoordinateStorageResponse with success status
     """
     try:
-        data = {
-            "lat": request.lat,
-            "lon": request.lon,
-            "city": request.city,
-            "country": request.country
-        }
 
-        success = storage.save_coordinate(request.ip, data)
+        success = storage.save_coordinate(request.ip, request)
 
         if not success:
             raise HTTPException(

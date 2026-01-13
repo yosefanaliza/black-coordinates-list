@@ -1,12 +1,13 @@
-from typing import Optional, List
+from typing import Optional, List, Annotated
 from pydantic import BaseModel, Field
+from ipaddress import IPv4Address
 
 
-class CoordinateRequest(BaseModel):
+class CoordinateItem(BaseModel):
     """Request model for storing coordinates"""
-    ip: str
-    lat: float = Field(..., ge=-90, le=90, description="Latitude between -90 and 90")
-    lon: float = Field(..., ge=-180, le=180, description="Longitude between -180 and 180")
+    ip: Annotated[IPv4Address, Field(..., description="Valid IPv4 address")]
+    lat: Annotated[float, Field(..., ge=-90, le=90, description="Latitude between -90 and 90")]
+    lon: Annotated[float, Field(..., ge=-180, le=180, description="Longitude between -180 and 180")]
     city: Optional[str] = None
     country: Optional[str] = None
 
@@ -15,16 +16,8 @@ class CoordinateStorageResponse(BaseModel):
     """Response model for coordinate storage operations"""
     success: bool
     message: str
-    ip: str
+    ip: IPv4Address
 
-
-class CoordinateItem(BaseModel):
-    """Model for a single coordinate item"""
-    ip: str
-    lat: float
-    lon: float
-    city: Optional[str] = None
-    country: Optional[str] = None
 
 
 class AllCoordinatesResponse(BaseModel):
