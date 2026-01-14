@@ -36,10 +36,14 @@ External Request → Service A → External API (ip-api.com)
 ### Service A (IP Resolution)
 - **Location:** `service-a/app/`
 - **Entry point:** `main.py` (FastAPI app)
-- **Business logic:** `services.py` - Contains retry logic (MAX_RETRIES=2) for external API calls
-- **Key function:** `resolve_ip()` orchestrates: API call → forward to Service B
+- **Business logic:** `services/coordinates.py` - CoordinatesService class with retry logic (MAX_RETRIES=2)
+- **Key methods:**
+  - `resolve_ip()` - Orchestrates: API call → forward to Service B
+  - `call_external_ip_api()` - Calls ip-api.com with retry logic
+  - `forward_to_service_b()` - HTTP POST to Service B
+  - `fetch_all_coordinates()` - Retrieves all coordinates from Service B
 - **External dependency:** ip-api.com (rate limit: 45 req/min)
-- **Shared models used:** `IPRequest`, `CoordinateItem`, `CoordinateStorageResponse`, `ExternalAPIResponse`
+- **Shared models used:** `IPRequest`, `CoordinateItem`, `CoordinateStorageResponse`, `AllCoordinatesResponse`, `ExternalAPIResponse`
 - **Environment variables:**
   - `SERVICE_B_HOST` - hostname only (no protocol)
   - `SERVICE_B_PORT` - port number (default: "8000" for Docker, "80" for K8s)
@@ -48,7 +52,11 @@ External Request → Service A → External API (ip-api.com)
 ### Service B (Coordinate Storage)
 - **Location:** `service-b/app/`
 - **Entry point:** `main.py` (FastAPI app with startup/shutdown hooks)
-- **Storage logic:** `storage.py` - Global Redis client pattern with connection pooling
+- **Storage logic:** `storage/redis.py` - RedisClient class with connection management
+- **Business logic:** `services/coordinates.py` - CoordinatesService class for data operations
+- **Key components:**
+  - `RedisClient` - Singleton instance with `connect()`, `close()`, `instance()`, `is_connected()` methods
+  - `CoordinatesService` - Uses redis_client for `save_coordinate()` and `get_all_coordinates()`
 - **Redis connection:** Uses StatefulSet with headless service
 - **Shared models used:** `CoordinateItem`, `CoordinateStorageResponse`, `AllCoordinatesResponse`, `HealthResponse`
 - **Environment variables:**
@@ -158,11 +166,16 @@ oc exec -it deployment/service-a -- curl http://service-b:8000/health
 ## Important Configuration Details
 
 ### Environment Variable Pattern
-Service A constructs the full URL in code:
+Service A constructs the full URL in CoordinatesService class:
 ```python
-service_b_host = os.getenv("SERVICE_B_HOST", "service-b")
-service_b_port = os.getenv("SERVICE_B_PORT", "8000")
-url = f"http://{service_b_host}:{service_b_port}/coordinates"
+class CoordinatesService:
+    def __init__(self):
+        self.service_b_host = os.getenv("SERVICE_B_HOST", "service-b")
+        self.service_b_port = os.getenv("SERVICE_B_PORT", "8000")
+
+    def forward_to_service_b(self, data: CoordinateItem):
+        url = f"http://{self.service_b_host}:{self.service_b_port}/coordinates/"
+        # POST request to Service B
 ```
 
 ### Docker vs Kubernetes Differences
@@ -201,13 +214,18 @@ service-a/
   app/
     main.py            # Imports from server.py, logging, lifecycle events
     server.py          # FastAPI app initialization, router registration
-    services.py        # resolve_ip() orchestration
-                       # call_external_ip_api() with retry logic
-                       # forward_to_service_b() HTTP POST
+    services/
+      __init__.py
+      coordinates.py   # CoordinatesService class
+                       # - resolve_ip() orchestration
+                       # - call_external_ip_api() with retry logic
+                       # - forward_to_service_b() HTTP POST
+                       # - fetch_all_coordinates() HTTP GET
     routes/
       __init__.py
       health.py        # GET /health endpoint
-      coordinates.py   # POST /coordinates/resolve (with /coordinates prefix)
+      coordinates.py   # POST /coordinates/resolve, GET /coordinates/
+                       # Creates coordinates_service = CoordinatesService()
   Dockerfile           # Build context: root (.), copies shared/ then app/
   requirements.txt
 ```
@@ -216,30 +234,43 @@ service-a/
 ```
 service-b/
   app/
-    main.py            # Imports from server.py, logging, Redis lifecycle
+    main.py            # Imports from server.py, logging
+                       # Calls redis_client.connect() on startup
+                       # Calls redis_client.close() on shutdown
     server.py          # FastAPI app initialization, router registration
+    services/
+      __init__.py
+      coordinates.py   # CoordinatesService class
+                       # - __init__() gets redis_client instance
+                       # - save_coordinate() stores in Redis
+                       # - get_all_coordinates() retrieves all data
     routes/
       __init__.py
       health.py        # GET /health endpoint
+                       # Uses redis_client.is_connected() for health checks
       coordinates.py   # POST/GET /coordinates/ (with /coordinates prefix)
+                       # Creates coordinates_service = CoordinatesService()
     storage/
       __init__.py
-      redis.py         # Global Redis client pattern
-                       # connect_redis(), close_redis()
-                       # save_coordinate() Redis SET
-                       # get_all_coordinates() Redis KEYS + MGET
+      redis.py         # RedisClient class + global redis_client instance
+                       # - connect() initializes Redis connection
+                       # - close() closes connection
+                       # - instance() returns active Redis client
+                       # - is_connected() checks connectivity
   Dockerfile           # Build context: root (.), copies shared/ then app/
   requirements.txt
 ```
 
 **Architecture Pattern:**
 - **server.py** - Contains FastAPI app initialization and router registration
-- **main.py** - Imports app from server.py, configures logging, lifecycle hooks
-- **routes/** - Dedicated folder for route handlers (health.py, coordinates.py)
-- **storage/** - (Service B only) Storage layer abstraction (redis.py)
+- **main.py** - Imports app from server.py, configures logging, lifecycle hooks (redis_client connect/close)
+- **routes/** - Dedicated folder for route handlers (health.py, coordinates.py) with module-level service instances
+- **services/** - Business logic classes (CoordinatesService) that orchestrate operations
+- **storage/** - (Service B only) Data access layer with RedisClient class and global redis_client instance
 - Both services import shared models: `from shared.models import IPRequest, CoordinateItem`
 - No local schemas.py files - all models centralized in shared/models.py
-- Clean separation: server setup → routes → business logic/storage
+- Class-based architecture with singleton pattern for service and storage instances
+- Clean separation: server setup → routes → services (business logic) → storage (data access)
 
 ## Common Issues & Solutions
 
