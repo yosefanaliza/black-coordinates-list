@@ -1,7 +1,6 @@
 import logging
 import os
-from fastapi import FastAPI
-from .routes import router
+from .server import app
 
 # Configure logging
 log_level = os.getenv("LOG_LEVEL", "INFO")
@@ -12,16 +11,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-# Create FastAPI application
-app = FastAPI(
-    title="Service A - IP Resolution",
-    description="IP resolution service that receives IP addresses, converts them to geographic coordinates using external API, and forwards to storage service.",
-    version="1.0.0"
-)
-
-# Include router
-app.include_router(router)
 
 
 @app.on_event("startup")

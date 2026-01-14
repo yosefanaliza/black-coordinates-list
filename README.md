@@ -62,29 +62,36 @@ The system is built using a microservices architecture with clear separation of 
 
 ```
 black-coordinates-list/
-├── shared/            # Shared Pydantic models used by both services
+├── shared/                # Shared Pydantic models used by both services
 │   ├── __init__.py
-│   └── models.py      # IPRequest, CoordinateItem, Response models
-├── service-a/         # IP Resolution Service (FastAPI)
+│   └── models.py          # IPRequest, CoordinateItem, Response models
+├── service-a/             # IP Resolution Service (FastAPI)
 │   ├── app/
-│   │   ├── main.py    # FastAPI application
-│   │   ├── routes.py  # HTTP endpoints
-│   │   └── services.py # Business logic
+│   │   ├── main.py        # Logging, lifecycle hooks
+│   │   ├── server.py      # FastAPI app initialization
+│   │   ├── services.py    # Business logic
+│   │   └── routes/
+│   │       ├── health.py      # Health check endpoint
+│   │       └── coordinates.py # IP resolution endpoint
 │   ├── Dockerfile
 │   └── requirements.txt
-├── service-b/         # Coordinate Storage Service (FastAPI + Redis)
+├── service-b/             # Coordinate Storage Service (FastAPI + Redis)
 │   ├── app/
-│   │   ├── main.py    # FastAPI application
-│   │   ├── routes.py  # HTTP endpoints
-│   │   └── storage.py # Redis operations
+│   │   ├── main.py        # Logging, Redis lifecycle
+│   │   ├── server.py      # FastAPI app initialization
+│   │   ├── routes/
+│   │   │   ├── health.py      # Health check endpoint
+│   │   │   └── coordinates.py # Storage endpoints
+│   │   └── storage/
+│   │       └── redis.py       # Redis operations
 │   ├── Dockerfile
 │   └── requirements.txt
-├── k8s/               # Kubernetes/OpenShift deployment manifests
-├── docker-compose.yml # Local development environment
-└── CLAUDE.md          # Developer guide for AI assistants
+├── k8s/                   # Kubernetes/OpenShift deployment manifests
+├── docker-compose.yml     # Local development environment
+└── CLAUDE.md              # Developer guide for AI assistants
 ```
 
-**Architecture Pattern:** Each service follows clean architecture: `main.py` (app) → `routes.py` (HTTP) → `services.py`/`storage.py` (logic), with shared Pydantic models in `/shared/models.py` for consistent validation across services.
+**Architecture Pattern:** Clean modular structure with `server.py` (FastAPI setup) → `routes/` (endpoint handlers) → `services.py`/`storage/` (business logic), with shared Pydantic models in `/shared/models.py` for type consistency across services.
 
 ## Quick Start
 
@@ -97,12 +104,12 @@ black-coordinates-list/
 docker-compose up --build
 
 # Test the system
-curl -X POST http://localhost:8000/resolve \
+curl -X POST http://localhost:8000/coordinates/resolve \
   -H "Content-Type: application/json" \
   -d '{"ip": "8.8.8.8"}'
 
 # Retrieve all coordinates
-curl http://localhost:8001/coordinates
+curl http://localhost:8001/coordinates/
 
 # Stop services
 docker-compose down
@@ -150,7 +157,7 @@ See [CLAUDE.md](CLAUDE.md) for detailed deployment commands, debugging, and trou
 
 | Endpoint | Method | Purpose | Request Example |
 |----------|--------|---------|-----------------|
-| `/resolve` | POST | Resolve IP to coordinates | `{"ip": "8.8.8.8"}` |
+| `/coordinates/resolve` | POST | Resolve IP to coordinates | `{"ip": "8.8.8.8"}` |
 | `/health` | GET | Health check | - |
 | `/` | GET | Service info | - |
 
@@ -158,7 +165,7 @@ See [CLAUDE.md](CLAUDE.md) for detailed deployment commands, debugging, and trou
 
 **Example:**
 ```bash
-curl -X POST http://localhost:8000/resolve \
+curl -X POST http://localhost:8000/coordinates/resolve \
   -H "Content-Type: application/json" \
   -d '{"ip": "8.8.8.8"}'
 
@@ -174,8 +181,8 @@ curl -X POST http://localhost:8000/resolve \
 
 | Endpoint | Method | Purpose | Access |
 |----------|--------|---------|--------|
-| `/coordinates` | POST | Store coordinates | Service A only |
-| `/coordinates` | GET | Retrieve all data | Internal/admin |
+| `/coordinates/` | POST | Store coordinates | Service A only |
+| `/coordinates/` | GET | Retrieve all data | Internal/admin |
 | `/health` | GET | Health check | Internal |
 
 **Interactive API Documentation:**

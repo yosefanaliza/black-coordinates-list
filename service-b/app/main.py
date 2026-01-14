@@ -1,8 +1,7 @@
 import logging
 import os
-from fastapi import FastAPI
-from .routes import router
-from . import storage
+from .server import app
+from .storage import redis
 
 # Configure logging
 log_level = os.getenv("LOG_LEVEL", "INFO")
@@ -14,22 +13,12 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Create FastAPI application
-app = FastAPI(
-    title="Service B - Coordinate Storage",
-    description="Storage service for geographic coordinates. Receives coordinates from Service A and stores them in Redis.",
-    version="1.0.0"
-)
-
-# Include router
-app.include_router(router)
-
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize Redis connection on startup"""
     try:
-        storage.connect_redis()
+        redis.connect_redis()
         logger.info("Service B started successfully")
     except Exception as e:
         logger.error(f"Failed to start Service B: {e}")
@@ -40,7 +29,7 @@ async def startup_event():
 async def shutdown_event():
     """Close Redis connection on shutdown"""
     try:
-        storage.close_redis()
+        redis.close_redis()
         logger.info("Service B shut down successfully")
     except Exception as e:
         logger.warning(f"Error during shutdown: {e}")
