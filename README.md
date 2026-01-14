@@ -69,21 +69,24 @@ black-coordinates-list/
 │   ├── app/
 │   │   ├── main.py        # Logging, lifecycle hooks
 │   │   ├── server.py      # FastAPI app initialization
-│   │   ├── services.py    # Business logic
+│   │   ├── services/
+│   │   │   └── coordinates.py # CoordinatesService class (business logic)
 │   │   └── routes/
 │   │       ├── health.py      # Health check endpoint
-│   │       └── coordinates.py # IP resolution endpoint
+│   │       └── coordinates.py # IP resolution endpoints
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── service-b/             # Coordinate Storage Service (FastAPI + Redis)
 │   ├── app/
 │   │   ├── main.py        # Logging, Redis lifecycle
 │   │   ├── server.py      # FastAPI app initialization
+│   │   ├── services/
+│   │   │   └── coordinates.py # CoordinatesService class (business logic)
 │   │   ├── routes/
 │   │   │   ├── health.py      # Health check endpoint
 │   │   │   └── coordinates.py # Storage endpoints
 │   │   └── storage/
-│   │       └── redis.py       # Redis operations
+│   │       └── redis.py       # RedisClient class (connection management)
 │   ├── Dockerfile
 │   └── requirements.txt
 ├── k8s/                   # Kubernetes/OpenShift deployment manifests
@@ -91,7 +94,7 @@ black-coordinates-list/
 └── CLAUDE.md              # Developer guide for AI assistants
 ```
 
-**Architecture Pattern:** Clean modular structure with `server.py` (FastAPI setup) → `routes/` (endpoint handlers) → `services.py`/`storage/` (business logic), with shared Pydantic models in `/shared/models.py` for type consistency across services.
+**Architecture Pattern:** Clean class-based structure with `server.py` (FastAPI setup) → `routes/` (endpoint handlers) → `services/` (business logic classes) → `storage/` (data access classes), with shared Pydantic models in `/shared/models.py` for type consistency across services. Both services use singleton service instances for clean dependency management.
 
 ## Quick Start
 
