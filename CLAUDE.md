@@ -21,12 +21,25 @@ External Request → Service A → External API (ip-api.com)
 - Each service only knows the minimum required for its responsibility
 - Communication between services is via HTTP with explicit host/port environment variables
 
+### Shared Models
+- **Location:** `shared/models.py`
+- **Purpose:** Centralized Pydantic models used by both services for consistent validation
+- **Key models:**
+  - `IPRequest` - IP address validation using IPv4Address type
+  - `CoordinateItem` - Coordinate data with lat/lon validation
+  - `CoordinateStorageResponse` - Response for storage operations
+  - `AllCoordinatesResponse` - List of all stored coordinates
+  - `HealthResponse` - Health check responses
+  - `ExternalAPIResponse` - ip-api.com response validation
+- **Import pattern:** `from shared.models import IPRequest, CoordinateItem`
+
 ### Service A (IP Resolution)
 - **Location:** `service-a/app/`
 - **Entry point:** `main.py` (FastAPI app)
 - **Business logic:** `services.py` - Contains retry logic (MAX_RETRIES=2) for external API calls
 - **Key function:** `resolve_ip()` orchestrates: API call → forward to Service B
 - **External dependency:** ip-api.com (rate limit: 45 req/min)
+- **Shared models used:** `IPRequest`, `CoordinateItem`, `CoordinateStorageResponse`, `ExternalAPIResponse`
 - **Environment variables:**
   - `SERVICE_B_HOST` - hostname only (no protocol)
   - `SERVICE_B_PORT` - port number (default: "8000" for Docker, "80" for K8s)
@@ -37,6 +50,7 @@ External Request → Service A → External API (ip-api.com)
 - **Entry point:** `main.py` (FastAPI app with startup/shutdown hooks)
 - **Storage logic:** `storage.py` - Global Redis client pattern with connection pooling
 - **Redis connection:** Uses StatefulSet with headless service
+- **Shared models used:** `CoordinateItem`, `CoordinateStorageResponse`, `AllCoordinatesResponse`, `HealthResponse`
 - **Environment variables:**
   - `REDIS_HOST` - For K8s: `redis-0.redis` (direct pod access via headless service)
   - `REDIS_PORT` - default: "6379"
@@ -65,14 +79,19 @@ docker-compose down
 
 ### Building Docker Images
 
+**IMPORTANT:** Always build from the project root directory to include the `/shared` models package.
+
 ```bash
-# Service A
-cd service-a
+# Build Service A (from project root)
 docker build -t service-a:latest -f service-a/Dockerfile .
 
-# Service B
-cd service-b
+# Build Service B (from project root)
 docker build -t service-b:latest -f service-b/Dockerfile .
+
+# Both Dockerfiles:
+# 1. Use root directory as build context (.)
+# 2. Copy shared/ directory before service code
+# 3. Services import with: from shared.models import ...
 ```
 
 ### Kubernetes/OpenShift Deployment
@@ -163,27 +182,49 @@ url = f"http://{service_b_host}:{service_b_port}/coordinates"
 
 ## Code Structure Patterns
 
+### Shared Models Structure
+```
+shared/
+  __init__.py   # Empty, makes shared a Python package
+  models.py     # All Pydantic models shared between services
+                # IPRequest - IP validation with IPv4Address
+                # CoordinateItem - Coordinate data model
+                # CoordinateStorageResponse - Storage operation response
+                # AllCoordinatesResponse - Bulk retrieval response
+                # HealthResponse - Health check model
+                # ExternalAPIResponse - ip-api.com response validation
+```
+
 ### Service A Structure
 ```
-service-a/app/
-  main.py       # FastAPI app, startup validation of env vars
-  routes.py     # Thin HTTP layer, no business logic
-  services.py   # resolve_ip() orchestration
+service-a/
+  app/
+    main.py     # FastAPI app, startup validation of env vars
+    routes.py   # Thin HTTP layer, imports from shared.models
+    services.py # resolve_ip() orchestration
                 # call_external_ip_api() with retry logic
                 # forward_to_service_b() HTTP POST
-  schemas.py    # Pydantic models for validation
+  Dockerfile    # Build context: root (.), copies shared/ then app/
+  requirements.txt
 ```
 
 ### Service B Structure
 ```
-service-b/app/
-  main.py       # FastAPI app, connects Redis on startup
-  routes.py     # Thin HTTP layer
-  storage.py    # Global Redis client pattern
+service-b/
+  app/
+    main.py     # FastAPI app, connects Redis on startup
+    routes.py   # Thin HTTP layer, imports from shared.models
+    storage.py  # Global Redis client pattern
                 # store_coordinates() Redis SET
                 # get_all_coordinates() Redis KEYS + MGET
-  schemas.py    # Pydantic models
+  Dockerfile    # Build context: root (.), copies shared/ then app/
+  requirements.txt
 ```
+
+**Import Pattern:**
+- Both services import shared models: `from shared.models import IPRequest, CoordinateItem`
+- No local schemas.py files needed - all models centralized in shared/models.py
+- Ensures type consistency between service communication
 
 ## Common Issues & Solutions
 
@@ -211,12 +252,15 @@ service-b/app/
 ## Deployment Checklist
 
 When deploying changes:
-1. Update Docker images with new tags (e.g., `v2`, `v3`)
-2. Push images to registry (Docker Hub or OpenShift internal registry)
-3. Update deployment YAMLs with new image tags
-4. Apply in correct order: Redis → Service B → Service A
-5. Verify each component before deploying the next: `oc wait --for=condition=ready pod -l app=<name>`
-6. Check logs immediately after deployment
+1. **Build images from root directory** to include shared models: `docker build -f service-a/Dockerfile .`
+2. Update Docker images with new tags (e.g., `v2`, `v3`)
+3. Push images to registry (Docker Hub or OpenShift internal registry)
+4. Update deployment YAMLs with new image tags
+5. Apply in correct order: Redis → Service B → Service A
+6. Verify each component before deploying the next: `oc wait --for=condition=ready pod -l app=<name>`
+7. Check logs immediately after deployment
+
+**Important:** If you modify shared models, rebuild and redeploy BOTH services even if their service-specific code hasn't changed.
 
 ## API Response Patterns
 
