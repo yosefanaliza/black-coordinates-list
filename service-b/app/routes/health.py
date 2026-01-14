@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, HTTPException, status
-from ..storage import redis
+from ..storage.redis import redis_client
 from shared.models import HealthResponse
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ async def health_check():
     Returns:
         HealthResponse with service status and Redis connectivity
     """
-    redis_connected = redis.is_redis_connected()
+    redis_connected = redis_client.is_connected()
 
     if not redis_connected:
         raise HTTPException(

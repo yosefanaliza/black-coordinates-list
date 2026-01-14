@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, HTTPException, status
-from ..storage import redis
+from ..services.coordinates import CoordinatesService
 from shared.models import (
     CoordinateItem,
     CoordinateStorageResponse,
@@ -9,6 +9,9 @@ from shared.models import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/coordinates")
+
+# Initialize coordinates service
+coordinates_service = CoordinatesService()
 
 
 @router.post("/", response_model=CoordinateStorageResponse)
@@ -23,8 +26,7 @@ async def store_coordinates(request: CoordinateItem):
         CoordinateStorageResponse with success status
     """
     try:
-
-        success = redis.save_coordinate(request.ip, request)
+        success = coordinates_service.save_coordinate(request.ip, request)
 
         if not success:
             raise HTTPException(
@@ -56,7 +58,7 @@ async def get_coordinates():
         AllCoordinatesResponse with list of all coordinates
     """
     try:
-        coordinates_data = redis.get_all_coordinates()
+        coordinates_data = coordinates_service.get_all_coordinates()
 
         coordinates = [
             CoordinateItem(**coord) for coord in coordinates_data
