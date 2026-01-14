@@ -19,7 +19,7 @@ Service A is the entry point and IP resolution layer of the Black Coordinates Li
 
 ## API Endpoints
 
-### POST /resolve
+### POST /coordinates/resolve
 Resolve an IP address to geographic coordinates and store them.
 
 **Request Body:**
@@ -121,23 +121,25 @@ Once running, visit:
 
 ## Docker Build
 
+**Important:** Build from the project root to include shared models.
+
 ```bash
-cd service-a
-docker build -t service-a:latest -f app/Dockerfile .
+# From project root directory
+docker build -t service-a:latest -f service-a/Dockerfile .
 ```
 
 ## Testing
 
 ### Test IP Resolution (with Service B running)
 ```bash
-curl -X POST http://localhost:8001/resolve \
+curl -X POST http://localhost:8001/coordinates/resolve \
   -H "Content-Type: application/json" \
   -d '{"ip": "8.8.8.8"}'
 ```
 
 ### Test Invalid IP
 ```bash
-curl -X POST http://localhost:8001/resolve \
+curl -X POST http://localhost:8001/coordinates/resolve \
   -H "Content-Type: application/json" \
   -d '{"ip": "999.999.999.999"}'
 ```
@@ -149,28 +151,37 @@ curl http://localhost:8001/health
 
 ## Architecture
 
-Service A follows a clean three-layer architecture:
+Service A follows a clean modular architecture:
 
-1. **routes.py** - Thin HTTP endpoint layer (no business logic)
-2. **services.py** - Business logic:
+1. **main.py** - Application entry point with logging and lifecycle hooks
+2. **server.py** - FastAPI application initialization and router registration
+3. **routes/** - HTTP endpoint handlers:
+   - `health.py` - GET /health endpoint
+   - `coordinates.py` - POST /coordinates/resolve endpoint
+4. **services.py** - Business logic:
    - `call_external_ip_api()` - External API integration
    - `forward_to_service_b()` - Internal service communication
    - `resolve_ip()` - Main orchestration logic
-3. **schemas.py** - Data validation and models (Pydantic)
+5. **shared/models.py** - Shared Pydantic models imported from project root:
+   - `IPRequest` - IP address validation
+   - `CoordinateItem` - Coordinate data model
+   - `CoordinateStorageResponse` - Storage operation responses
+   - `ExternalAPIResponse` - External API response validation
 
 This separation ensures:
-- Clear responsibility boundaries
+- Clear responsibility boundaries with dedicated route files
+- Type consistency between services via shared models
 - Easy testing with mocked dependencies
 - Simplified debugging and logging
 - Future scalability
 
 ## Data Flow
 
-1. **External Request** → POST /resolve with IP address
+1. **External Request** → POST /coordinates/resolve with IP address
 2. **Validation** → Pydantic validates IP format
 3. **External API Call** → GET to ip-api.com/json/{ip}
 4. **Response Processing** → Extract lat, lon, city, country
-5. **Forward to Service B** → POST to Service B /coordinates
+5. **Forward to Service B** → POST to Service B /coordinates/
 6. **Response to Client** → Return success/failure status
 
 ## Error Handling
@@ -211,7 +222,7 @@ Service A validates IP addresses using Pydantic:
 
 Service A communicates with Service B via HTTP POST:
 
-**Endpoint:** `{SERVICE_B_URL}/coordinates`
+**Endpoint:** `{SERVICE_B_URL}/coordinates/`
 
 **Payload:**
 ```json

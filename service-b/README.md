@@ -18,7 +18,7 @@ Service B is the storage and retrieval layer of the Black Coordinates List syste
 
 ## API Endpoints
 
-### POST /coordinates
+### POST /coordinates/
 Store coordinates received from Service A.
 
 **Request Body:**
@@ -41,7 +41,7 @@ Store coordinates received from Service A.
 }
 ```
 
-### GET /coordinates
+### GET /coordinates/
 Retrieve all stored coordinates.
 
 **Response:**
@@ -132,16 +132,18 @@ Once running, visit:
 
 ## Docker Build
 
+**Important:** Build from the project root to include shared models.
+
 ```bash
-cd service-b
-docker build -t service-b:latest -f app/Dockerfile .
+# From project root directory
+docker build -t service-b:latest -f service-b/Dockerfile .
 ```
 
 ## Testing
 
 ### Test Storage
 ```bash
-curl -X POST http://localhost:8000/coordinates \
+curl -X POST http://localhost:8000/coordinates/ \
   -H "Content-Type: application/json" \
   -d '{
     "ip": "8.8.8.8",
@@ -154,7 +156,7 @@ curl -X POST http://localhost:8000/coordinates \
 
 ### Test Retrieval
 ```bash
-curl http://localhost:8000/coordinates
+curl http://localhost:8000/coordinates/
 ```
 
 ### Test Health Check
@@ -164,14 +166,24 @@ curl http://localhost:8000/health
 
 ## Architecture
 
-Service B follows a clean three-layer architecture:
+Service B follows a clean modular architecture:
 
-1. **routes.py** - Thin HTTP endpoint layer
-2. **storage.py** - Redis interaction and business logic
-3. **schemas.py** - Data validation and models
+1. **main.py** - Application entry point with logging and Redis lifecycle management
+2. **server.py** - FastAPI application initialization and router registration
+3. **routes/** - HTTP endpoint handlers:
+   - `health.py` - GET /health endpoint
+   - `coordinates.py` - POST/GET /coordinates/ endpoints
+4. **storage/** - Data persistence layer:
+   - `redis.py` - Redis connection and operations
+5. **shared/models.py** - Shared Pydantic models imported from project root:
+   - `CoordinateItem` - Coordinate data validation
+   - `CoordinateStorageResponse` - Storage operation responses
+   - `AllCoordinatesResponse` - Bulk retrieval responses
+   - `HealthResponse` - Health check responses
 
 This separation ensures:
-- Clear responsibility boundaries
+- Clear responsibility boundaries with dedicated route and storage folders
+- Type consistency between services via shared models
 - Easy testing and maintenance
 - Simplified debugging
 - Future scalability

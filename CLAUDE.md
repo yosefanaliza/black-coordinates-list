@@ -126,12 +126,12 @@ curl http://localhost:8000/health  # Service A
 curl http://localhost:8001/health  # Service B
 
 # Resolve IP address (full flow)
-curl -X POST http://localhost:8000/resolve \
+curl -X POST http://localhost:8000/coordinates/resolve \
   -H "Content-Type: application/json" \
   -d '{"ip": "8.8.8.8"}'
 
 # Retrieve all coordinates
-curl http://localhost:8001/coordinates
+curl http://localhost:8001/coordinates/
 ```
 
 ### Debugging
@@ -199,12 +199,16 @@ shared/
 ```
 service-a/
   app/
-    main.py     # FastAPI app, startup validation of env vars
-    routes.py   # Thin HTTP layer, imports from shared.models
-    services.py # resolve_ip() orchestration
-                # call_external_ip_api() with retry logic
-                # forward_to_service_b() HTTP POST
-  Dockerfile    # Build context: root (.), copies shared/ then app/
+    main.py            # Imports from server.py, logging, lifecycle events
+    server.py          # FastAPI app initialization, router registration
+    services.py        # resolve_ip() orchestration
+                       # call_external_ip_api() with retry logic
+                       # forward_to_service_b() HTTP POST
+    routes/
+      __init__.py
+      health.py        # GET /health endpoint
+      coordinates.py   # POST /coordinates/resolve (with /coordinates prefix)
+  Dockerfile           # Build context: root (.), copies shared/ then app/
   requirements.txt
 ```
 
@@ -212,19 +216,30 @@ service-a/
 ```
 service-b/
   app/
-    main.py     # FastAPI app, connects Redis on startup
-    routes.py   # Thin HTTP layer, imports from shared.models
-    storage.py  # Global Redis client pattern
-                # store_coordinates() Redis SET
-                # get_all_coordinates() Redis KEYS + MGET
-  Dockerfile    # Build context: root (.), copies shared/ then app/
+    main.py            # Imports from server.py, logging, Redis lifecycle
+    server.py          # FastAPI app initialization, router registration
+    routes/
+      __init__.py
+      health.py        # GET /health endpoint
+      coordinates.py   # POST/GET /coordinates/ (with /coordinates prefix)
+    storage/
+      __init__.py
+      redis.py         # Global Redis client pattern
+                       # connect_redis(), close_redis()
+                       # save_coordinate() Redis SET
+                       # get_all_coordinates() Redis KEYS + MGET
+  Dockerfile           # Build context: root (.), copies shared/ then app/
   requirements.txt
 ```
 
-**Import Pattern:**
+**Architecture Pattern:**
+- **server.py** - Contains FastAPI app initialization and router registration
+- **main.py** - Imports app from server.py, configures logging, lifecycle hooks
+- **routes/** - Dedicated folder for route handlers (health.py, coordinates.py)
+- **storage/** - (Service B only) Storage layer abstraction (redis.py)
 - Both services import shared models: `from shared.models import IPRequest, CoordinateItem`
-- No local schemas.py files needed - all models centralized in shared/models.py
-- Ensures type consistency between service communication
+- No local schemas.py files - all models centralized in shared/models.py
+- Clean separation: server setup → routes → business logic/storage
 
 ## Common Issues & Solutions
 

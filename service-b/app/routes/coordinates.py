@@ -1,17 +1,17 @@
 import logging
 from fastapi import APIRouter, HTTPException, status
-from . import storage
-from shared.models import ( CoordinateItem,
-    CoordinateStorageResponse,
-    AllCoordinatesResponse,
+from ..storage import redis
+from shared.models import (
     CoordinateItem,
-    HealthResponse )
+    CoordinateStorageResponse,
+    AllCoordinatesResponse
+)
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(prefix="/coordinates")
 
 
-@router.post("/coordinates", response_model=CoordinateStorageResponse)
+@router.post("/", response_model=CoordinateStorageResponse)
 async def store_coordinates(request: CoordinateItem):
     """
     Store coordinates received from Service A
@@ -24,7 +24,7 @@ async def store_coordinates(request: CoordinateItem):
     """
     try:
 
-        success = storage.save_coordinate(request.ip, request)
+        success = redis.save_coordinate(request.ip, request)
 
         if not success:
             raise HTTPException(
@@ -47,7 +47,7 @@ async def store_coordinates(request: CoordinateItem):
         )
 
 
-@router.get("/coordinates", response_model=AllCoordinatesResponse)
+@router.get("/", response_model=AllCoordinatesResponse)
 async def get_coordinates():
     """
     Retrieve all stored coordinates from Redis
@@ -56,7 +56,7 @@ async def get_coordinates():
         AllCoordinatesResponse with list of all coordinates
     """
     try:
-        coordinates_data = storage.get_all_coordinates()
+        coordinates_data = redis.get_all_coordinates()
 
         coordinates = [
             CoordinateItem(**coord) for coord in coordinates_data
@@ -74,26 +74,3 @@ async def get_coordinates():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve coordinates: {str(e)}"
         )
-
-
-@router.get("/health", response_model=HealthResponse)
-async def health_check():
-    """
-    Health check endpoint for Kubernetes probes
-
-    Returns:
-        HealthResponse with service status and Redis connectivity
-    """
-    redis_connected = storage.is_redis_connected()
-
-    if not redis_connected:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Redis is not connected"
-        )
-
-    return HealthResponse(
-        status="healthy",
-        service="Service B - Coordinate Storage",
-        redis_connected=redis_connected
-    )
