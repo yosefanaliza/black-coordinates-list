@@ -1,117 +1,62 @@
-import json
 import os
 import logging
-from typing import List, Optional
-from shared.models import CoordinateItem , IPField
+from typing import Optional
 import redis
 
 logger = logging.getLogger(__name__)
 
-# Global Redis client
-_redis_client: Optional[redis.Redis] = None
 
+class RedisClient:
+    """Redis connection manager"""
 
-def connect_redis() -> None:
-    """Initialize Redis connection using environment variables"""
-    global _redis_client
+    def __init__(self):
+        """Initialize Redis client configuration"""
+        self.redis_host = os.getenv("REDIS_HOST", "redis")
+        self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        self.redis_db = int(os.getenv("REDIS_DB", "0"))
+        self._client: Optional[redis.Redis] = None
 
-    redis_host = os.getenv("REDIS_HOST", "redis")
-    redis_port = int(os.getenv("REDIS_PORT", "6379"))
-    redis_db = int(os.getenv("REDIS_DB", "0"))
+    def connect(self) -> None:
+        """Initialize Redis connection"""
+        try:
+            self._client = redis.Redis(
+                host=self.redis_host,
+                port=self.redis_port,
+                db=self.redis_db,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_keepalive=True
+            )
+            # Test connection
+            self._client.ping()
+            logger.info(f"Successfully connected to Redis at {self.redis_host}:{self.redis_port}")
+        except redis.RedisError as e:
+            logger.error(f"Failed to connect to Redis: {e}")
+            raise
 
-    try:
-        _redis_client = redis.Redis(
-            host=redis_host,
-            port=redis_port,
-            db=redis_db,
-            decode_responses=True,
-            socket_connect_timeout=5,
-            socket_keepalive=True
-        )
-        # Test connection
-        _redis_client.ping()
-        logger.info(f"Successfully connected to Redis at {redis_host}:{redis_port}")
-    except redis.RedisError as e:
-        logger.error(f"Failed to connect to Redis: {e}")
-        raise
+    def close(self) -> None:
+        """Close Redis connection"""
+        if self._client:
+            self._client.close()
+            logger.info("Redis connection closed")
+            self._client = None
 
+    def instance(self) -> redis.Redis:
+        """Get the active Redis client instance"""
+        if self._client is None:
+            raise RuntimeError("Redis client not initialized. Call connect() first.")
+        return self._client
 
-def close_redis() -> None:
-    """Close Redis connection"""
-    global _redis_client
-    if _redis_client:
-        _redis_client.close()
-        logger.info("Redis connection closed")
-
-
-def get_redis_client() -> redis.Redis:
-    """Get the active Redis client"""
-    if _redis_client is None:
-        raise RuntimeError("Redis client not initialized. Call connect_redis() first.")
-    return _redis_client
-
-
-def is_redis_connected() -> bool:
-    """Check if Redis is connected"""
-    try:
-        if _redis_client is None:
+    def is_connected(self) -> bool:
+        """Check if Redis is connected"""
+        try:
+            if self._client is None:
+                return False
+            self._client.ping()
+            return True
+        except (redis.RedisError, Exception):
             return False
-        _redis_client.ping()
-        return True
-    except (redis.RedisError, Exception):
-        return False
 
 
-def save_coordinate(ip: IPField, data: CoordinateItem) -> bool:
-    """
-    Save coordinate data to Redis
-
-    Args:
-        ip: IP address (used as key)
-        data: Dictionary containing lat, lon, city, country
-
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    try:
-        client = get_redis_client()
-        json_data = data.model_dump_json(exclude={"ip"})
-        client.set(str(ip), json_data)
-        logger.info(f"Saved coordinates for IP: {ip}")
-        return True
-    except redis.RedisError as e:
-        logger.error(f"Failed to save coordinate for IP {ip}: {e}")
-        return False
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to serialize data for IP {ip}: {e}")
-        return False
-
-
-def get_all_coordinates() -> List[CoordinateItem]:
-    """
-    Retrieve all stored coordinates from Redis
-
-    Returns:
-        List of coordinate dictionaries with IP addresses
-    """
-    try:
-        client = get_redis_client()
-        keys = client.keys("*")
-
-        coordinates:List[CoordinateItem] = []
-        for key in keys:
-            try:
-                value = client.get(key)
-                if value:
-                    coord_data = json.loads(value)
-                    coord_data["ip"] = key
-                    coordinates.append(coord_data)
-            except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse data for key {key}: {e}")
-                continue
-
-        logger.info(f"Retrieved {len(coordinates)} coordinates from Redis")
-        return coordinates
-    except redis.RedisError as e:
-        logger.error(f"Failed to retrieve coordinates: {e}")
-        raise
+# Global Redis client instance
+redis_client = RedisClient()

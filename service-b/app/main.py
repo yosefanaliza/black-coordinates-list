@@ -1,7 +1,7 @@
 import logging
 import os
 from .server import app
-from .storage import redis
+from .storage.redis import redis_client
 
 # Configure logging
 log_level = os.getenv("LOG_LEVEL", "INFO")
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 async def startup_event():
     """Initialize Redis connection on startup"""
     try:
-        redis.connect_redis()
+        redis_client.connect()
         logger.info("Service B started successfully")
     except Exception as e:
         logger.error(f"Failed to start Service B: {e}")
@@ -29,7 +29,7 @@ async def startup_event():
 async def shutdown_event():
     """Close Redis connection on shutdown"""
     try:
-        redis.close_redis()
+        redis_client.close()
         logger.info("Service B shut down successfully")
     except Exception as e:
         logger.warning(f"Error during shutdown: {e}")
