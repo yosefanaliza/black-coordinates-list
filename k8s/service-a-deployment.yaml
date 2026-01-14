@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: service-a
-        image: yosefhershberg/blackcoord-service-a:v1
+        image: yosefhershberg/blackcoord-service-a:v2 
         imagePullPolicy: Always
         ports:
         - containerPort: 8000

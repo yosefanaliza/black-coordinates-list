@@ -1,13 +1,17 @@
 import logging
 from fastapi import APIRouter, HTTPException, status
 from .services import resolve_ip
-from .schemas import IPRequest, IPResolutionResponse, HealthResponse
+from shared.models import (
+    CoordinateStorageResponse, 
+    HealthResponse,
+    IPRequest
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/resolve", response_model=IPResolutionResponse)
+@router.post("/resolve", response_model=CoordinateStorageResponse)
 async def resolve_ip_address(request: IPRequest):
     """
     Resolve IP address to geographic coordinates
@@ -43,7 +47,7 @@ async def resolve_ip_address(request: IPRequest):
                 detail=result["message"]
             )
 
-        return IPResolutionResponse(**result)
+        return CoordinateStorageResponse(**result)
 
     except HTTPException:
         raise

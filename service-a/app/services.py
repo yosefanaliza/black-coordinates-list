@@ -2,7 +2,7 @@ import logging
 import os
 from typing import Dict, Any, Optional
 import httpx
-from .schemas import ExternalAPIResponse, CoordinatesPayload
+from shared.models import (CoordinateStorageResponse, IPField,ExternalAPIResponse,CoordinateItem)
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +12,7 @@ IP_API_TIMEOUT = int(os.getenv("IP_API_TIMEOUT", "5"))
 MAX_RETRIES = 2
 
 
-async def call_external_ip_api(ip: str) -> Optional[Dict[str, Any]]:
+async def call_external_ip_api(ip: IPField) -> Optional[Dict[str, Any]]:
     """
     Call external IP geolocation API (ip-api.com)
 
@@ -66,7 +66,7 @@ async def call_external_ip_api(ip: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-async def forward_to_service_b(data: CoordinatesPayload) -> bool:
+async def forward_to_service_b(data: CoordinateItem) -> bool:
     """
     Forward coordinate data to Service B for storage
 
@@ -90,7 +90,7 @@ async def forward_to_service_b(data: CoordinatesPayload) -> bool:
             logger.info(f"Forwarding coordinates to Service B for IP: {data.ip}")
             response = await client.post(
                 url,
-                json=data.model_dump(),
+                json=data.model_dump(mode='json'),
                 timeout=10.0
             )
 
@@ -112,7 +112,7 @@ async def forward_to_service_b(data: CoordinatesPayload) -> bool:
         return False
 
 
-async def resolve_ip(ip: str) -> Dict[str, Any]:
+async def resolve_ip(ip: IPField) -> CoordinateStorageResponse:
     """
     Main business logic: Resolve IP address and forward coordinates to Service B
 
@@ -133,7 +133,7 @@ async def resolve_ip(ip: str) -> Dict[str, Any]:
         }
 
     # Step 2: Prepare payload for Service B
-    payload = CoordinatesPayload(
+    payload = CoordinateItem(
         ip=ip,
         lat=geo_data["lat"],
         lon=geo_data["lon"],

@@ -62,14 +62,29 @@ The system is built using a microservices architecture with clear separation of 
 
 ```
 black-coordinates-list/
-├── service-a/          # IP Resolution Service (FastAPI)
-├── service-b/          # Coordinate Storage Service (FastAPI + Redis)
+├── shared/            # Shared Pydantic models used by both services
+│   ├── __init__.py
+│   └── models.py      # IPRequest, CoordinateItem, Response models
+├── service-a/         # IP Resolution Service (FastAPI)
+│   ├── app/
+│   │   ├── main.py    # FastAPI application
+│   │   ├── routes.py  # HTTP endpoints
+│   │   └── services.py # Business logic
+│   ├── Dockerfile
+│   └── requirements.txt
+├── service-b/         # Coordinate Storage Service (FastAPI + Redis)
+│   ├── app/
+│   │   ├── main.py    # FastAPI application
+│   │   ├── routes.py  # HTTP endpoints
+│   │   └── storage.py # Redis operations
+│   ├── Dockerfile
+│   └── requirements.txt
 ├── k8s/               # Kubernetes/OpenShift deployment manifests
 ├── docker-compose.yml # Local development environment
 └── CLAUDE.md          # Developer guide for AI assistants
 ```
 
-Each service follows a clean architecture: `main.py` (app) → `routes.py` (HTTP) → `services.py`/`storage.py` (logic) → `schemas.py` (validation).
+**Architecture Pattern:** Each service follows clean architecture: `main.py` (app) → `routes.py` (HTTP) → `services.py`/`storage.py` (logic), with shared Pydantic models in `/shared/models.py` for consistent validation across services.
 
 ## Quick Start
 
@@ -78,7 +93,7 @@ Each service follows a clean architecture: `main.py` (app) → `routes.py` (HTTP
 **Prerequisites:** Docker 20.10+, Docker Compose 2.0+
 
 ```bash
-# Start all services
+# Start all services (builds from root context to include shared models)
 docker-compose up --build
 
 # Test the system
@@ -92,6 +107,8 @@ curl http://localhost:8001/coordinates
 # Stop services
 docker-compose down
 ```
+
+**Note:** Dockerfiles use root directory as build context to access the `/shared` models directory. Both services import shared Pydantic models via `from shared.models import ...`
 
 **Service URLs:**
 - Service A: http://localhost:8000 (external API)
@@ -194,6 +211,28 @@ See `.env.example` for local development configuration.
 **For production:** Consider premium tier, alternative providers, or caching frequent lookups.
 
 ## Development
+
+### Building Docker Images
+
+When building images individually for deployment, use the root directory as context:
+
+```bash
+# Build Service A (from project root)
+docker build -t service-a:latest -f service-a/Dockerfile .
+
+# Build Service B (from project root)
+docker build -t service-b:latest -f service-b/Dockerfile .
+
+# Tag for registry (example for Docker Hub)
+docker tag service-a:latest yourusername/service-a:v1
+docker tag service-b:latest yourusername/service-b:v1
+
+# Push to registry
+docker push yourusername/service-a:v1
+docker push yourusername/service-b:v1
+```
+
+**Important:** Always build from the root directory (`.`) to include the `/shared` models package.
 
 ### Git Workflow
 
