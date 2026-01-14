@@ -2,7 +2,7 @@ import logging
 import os
 from typing import Dict, Any, Optional
 import httpx
-from shared.models import (CoordinateStorageResponse, IPField, ExternalAPIResponse, CoordinateItem)
+from shared.models import (CoordinateStorageResponse, IPField, ExternalAPIResponse, CoordinateItem, AllCoordinatesResponse)
 
 logger = logging.getLogger(__name__)
 
@@ -169,3 +169,39 @@ class CoordinatesService:
                 "lon": geo_data["lon"]
             }
         }
+
+    async def fetch_all_coordinates(self) -> Optional[AllCoordinatesResponse]:
+        """
+        Fetch all stored coordinates from Service B
+
+        Returns:
+            AllCoordinatesResponse with all coordinates or None if failed
+        """
+        if not self.service_b_host:
+            logger.error("SERVICE_B_HOST environment variable not set")
+            return None
+
+        url = f"http://{self.service_b_host}:{self.service_b_port}/coordinates/"
+
+        try:
+            async with httpx.AsyncClient() as client:
+                logger.info("Fetching all coordinates from Service B")
+                response = await client.get(url, timeout=10.0)
+
+                if response.status_code == 200:
+                    data = response.json()
+                    logger.info(f"Successfully fetched {data.get('count', 0)} coordinates from Service B")
+                    return AllCoordinatesResponse(**data)
+                else:
+                    logger.error(f"Service B returned status {response.status_code}")
+                    return None
+
+        except httpx.TimeoutException:
+            logger.error("Timeout fetching coordinates from Service B")
+            return None
+        except httpx.ConnectError:
+            logger.error(f"Cannot connect to Service B at {self.service_b_host}")
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching coordinates from Service B: {e}")
+            return None

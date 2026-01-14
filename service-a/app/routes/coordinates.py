@@ -3,7 +3,8 @@ from fastapi import APIRouter, HTTPException, status
 from ..services.coordinates import CoordinatesService
 from shared.models import (
     CoordinateStorageResponse,
-    IPRequest
+    IPRequest,
+    AllCoordinatesResponse
 )
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,41 @@ async def resolve_ip_address(request: IPRequest):
         raise
     except Exception as e:
         logger.error(f"Unexpected error resolving IP {request.ip}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.get("/", response_model=AllCoordinatesResponse)
+async def get_all_coordinates():
+    """
+    Retrieve all stored coordinates from Service B
+
+    This endpoint:
+    1. Fetches all coordinates from Service B
+    2. Returns the complete list with count
+
+    Returns:
+        AllCoordinatesResponse with all stored coordinates
+    """
+    try:
+        logger.info("Received request to fetch all coordinates")
+
+        result = await coordinates_service.fetch_all_coordinates()
+
+        if result is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Failed to fetch coordinates from Service B"
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error fetching coordinates: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
